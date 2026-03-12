@@ -1,0 +1,19 @@
+# **App Name**: ALTOGEN
+
+## Core Features:
+
+- Secure User Authentication & Profile: User registration and login using Google Authentication. Provides a personal profile page for users to manage their referral code, saved e-wallet details, and access app information (About, Privacy, Disclaimer), alongside links to social channels.
+- AI Prompt Generation Tool: Users can input a product name/title and upload an image. The AI tool will then use its reasoning capabilities to generate three distinct scene prompts suitable for creative content generation.
+- AI Video Generation Tool: Users upload an image and provide a descriptive text prompt. The AI tool processes this input, displaying real-time loading progress, and generates an editable and downloadable video preview.
+- Monetization & Bonus System: Integrates subscription packages (7/10/30 days) with admin-confirmed automatic activation upon purchase and deactivation upon expiry. Features include a daily check-in bonus, a friend referral program, and opportunities for rewarded ad experiences.
+- Wallet & Transaction Management: Displays the user's current balance. Facilitates withdrawal requests to a registered e-wallet (minimal Rp.100,000, subject to admin review and confirmation). Enables deposits through a QRIS-based system, where users specify an amount (or choose a preset), input their e-wallet name/number, and a scannable QR code is generated with a payment timer, and recorded for admin confirmation.
+- Admin Dashboard: A secure, hidden administrator interface to manage user accounts (edit data, adjust balance, block, delete), oversee transactions, and publish/delete public notification messages for the application.
+- Asset Management Structure: Establish a standardized project structure, specifically utilizing an `assets/img/` folder to store all image resources including icons, logos, and splash screens for organized and efficient asset handling.
+
+## Style Guidelines:
+
+- The application employs a dark color scheme inspired by digital innovation and financial fluidity. The primary color is a vibrant purple-blue, #A26EF7 (HSL 250, 75%, 65%), used for interactive elements and highlights to convey modernity and professionalism. The background is a subtle, deep dark grey-purple, #1C1922 (HSL 250, 15%, 12%), providing an immersive and clean canvas. An energetic bright blue, #7AC6FF (HSL 220, 85%, 70%), serves as the accent color for call-to-action buttons and prominent indicators, ensuring high contrast and visibility.
+- Headlines utilize 'Space Grotesk' (sans-serif) for a contemporary, slightly technical, and bold aesthetic that stands out with its clean lines. Body text and longer content use 'Inter' (sans-serif), chosen for its exceptional readability and neutral, professional appearance, ensuring clear communication throughout the application.
+- All icons, especially those in the bottom navigation and feature representations, should be designed in a modern 3D style to align with the professional and futuristic aesthetic of the application.
+- The layout is responsive and mobile-first, adapting seamlessly across devices. It features prominent, intuitive navigation (like a persistent bottom bar) and effectively uses gradients, ample negative space, and modular sections to organize content cleanly while providing a sense of depth and modernity.
+- Key animated elements include a prominent loading progress indicator upon application startup and during generator processing. Additionally, subtle yet smooth transitions between pages and interactive micro-animations for buttons and and 3D UI elements enhance user engagement and provide fluid feedback.

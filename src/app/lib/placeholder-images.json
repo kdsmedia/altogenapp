@@ -1,0 +1,23 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "hero-splash",
+      "description": "Abstract 3D digital innovation splash",
+      "imageUrl": "https://picsum.photos/seed/altogen-1/1200/800",
+      "imageHint": "digital innovation"
+    },
+    {
+      "id": "ai-video-preview",
+      "description": "Futuristic video generation preview",
+      "imageUrl": "https://picsum.photos/seed/altogen-2/800/450",
+      "imageHint": "ai video"
+    },
+    {
+      "id": "qris-mock",
+      "description": "Mock QRIS payment code",
+      "imageUrl": "https://picsum.photos/seed/altogen-qris/400/400",
+      "imageHint": "qr code"
+    }
+  ]
+}
