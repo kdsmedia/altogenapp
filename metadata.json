@@ -1,0 +1,9 @@
+{
+  "name": "ALTO AI",
+  "description": "Native Android AI application with Gemini integration, video generation, and AdMob monetization.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
