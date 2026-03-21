@@ -1,10 +1,14 @@
 {
-  "name": "react-example",
+  "name": "altogenapp",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
@@ -29,7 +33,13 @@
     "expo-file-system": "~17.0.1",
     "expo-media-library": "~16.0.3",
     "lucide-react-native": "^0.395.0",
-    "nativewind": "^2.0.11"
+    "nativewind": "^2.0.11",
+    "react-dom": "18.2.0"
+  },
+  "overrides": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "@types/react": "~18.2.45"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
