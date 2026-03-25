@@ -1,0 +1,614 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { 
+  Home, BookOpen, Trophy, User, ChevronLeft, Star, 
+  CheckCircle2, XCircle, Calculator, Palette, Dog, 
+  Type, Square, Maximize, Play, Flame, Award, Settings,
+  Volume2, VolumeX, ShoppingBag, Lock, ShieldCheck, X,
+  Rocket, Sparkles
+} from 'lucide-react';
+
+// --- KONFIGURASI ASSET ---
+const SOUNDS = {
+  bgm: 'https://assets.mixkit.co/music/preview/mixkit-playful-monster-1231.mp3',
+  correct: 'https://assets.mixkit.co/sfx/preview/mixkit-cute-level-up-bell-594.mp3',
+  wrong: 'https://assets.mixkit.co/sfx/preview/mixkit-negative-answer-lose-2031.mp3',
+  click: 'https://assets.mixkit.co/sfx/preview/mixkit-light-button-2580.mp3',
+  win: 'https://assets.mixkit.co/sfx/preview/mixkit-winning-chime-2029.mp3',
+  buy: 'https://assets.mixkit.co/sfx/preview/mixkit-cash-register-purchase-2268.mp3'
+};
+
+const AVATARS = [
+  { id: '1', char: '😊', name: 'Si Ceria', cost: 0 },
+  { id: '2', char: '🦊', name: 'Rubah Pintar', cost: 200 },
+  { id: '3', char: '🐼', name: 'Panda Lucu', cost: 500 },
+  { id: '4', char: '🦄', name: 'Kuda Ajaib', cost: 1000 },
+  { id: '5', char: '🐉', name: 'Naga Hebat', cost: 2000 },
+  { id: '6', char: '🚀', name: 'Astronot', cost: 5000 },
+];
+
+const ACHIEVEMENTS = [
+  { id: 'a1', title: 'Bintang Baru', req: 100, icon: <Star size={40} className="text-yellow-500" /> },
+  { id: 'a2', title: 'Master Angka', req: 500, icon: <Calculator size={40} className="text-blue-500" /> },
+  { id: 'a3', title: 'Pakar Warna', req: 1000, icon: <Palette size={40} className="text-pink-500" /> },
+  { id: 'a4', title: 'Raja Belajar', req: 5000, icon: <Trophy size={40} className="text-orange-500" /> },
+];
+
+// --- KOMPONEN GLOBAL ---
+
+const Confetti = () => (
+  <div className="fixed inset-0 pointer-events-none z-[200] flex items-center justify-center">
+    {[...Array(25)].map((_, i) => (
+      <div key={i} className="absolute animate-bounce" style={{
+          left: `${Math.random() * 100}%`,
+          top: `-10%`,
+          animationDuration: `${Math.random() * 2 + 2}s`,
+          animationDelay: `${Math.random() * 2}s`,
+          fontSize: `${Math.random() * 20 + 20}px`
+        }}>
+        {['⭐', '✨', '🎈', '🎉', '🎊'][Math.floor(Math.random() * 5)]}
+      </div>
+    ))}
+  </div>
+);
+
+const FeedbackOverlay = ({ status }) => {
+  if (!status) return null;
+  return (
+    <div className={`fixed inset-0 flex items-center justify-center z-[250] animate-in fade-in duration-300 ${status === 'correct' ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+      <div className="bg-white p-10 rounded-[40px] shadow-2xl animate-in zoom-in bounce-in duration-500 flex flex-col items-center gap-4 border-4 border-white">
+        {status === 'correct' ? (
+          <><CheckCircle2 size={100} className="text-green-500" /><span className="text-2xl font-black text-green-600 uppercase">Hebat!</span></>
+        ) : (
+          <><XCircle size={100} className="text-red-500" /><span className="text-2xl font-black text-red-600 uppercase">Coba Lagi!</span></>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const ParentalGate = ({ onVerify, onCancel }) => {
+  const [q] = useState({ a: Math.floor(Math.random() * 5) + 2, b: Math.floor(Math.random() * 5) + 2 });
+  const [input, setInput] = useState('');
+  
+  const check = () => {
+    if (parseInt(input) === q.a + q.b) onVerify();
+    else { setInput(''); onCancel(); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-6">
+      <div className="bg-white p-8 rounded-[40px] w-full max-w-xs text-center shadow-2xl">
+        <ShieldCheck size={48} className="mx-auto text-indigo-600 mb-4" />
+        <h3 className="font-black text-xl mb-2 text-gray-800 uppercase tracking-tight">Area Orang Tua</h3>
+        <p className="text-gray-500 text-sm mb-6 font-medium">Berapa hasil dari <span className="font-bold text-gray-800 text-lg">{q.a} + {q.b}</span>?</p>
+        <input 
+          type="number" 
+          value={input} 
+          autoFocus
+          onChange={(e) => setInput(e.target.value)}
+          className="w-full bg-gray-100 border-none rounded-2xl p-4 text-center text-2xl font-black mb-6 outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="?"
+        />
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 py-3 font-bold text-gray-400">Batal</button>
+          <button onClick={check} className="flex-1 bg-indigo-600 text-white py-3 rounded-2xl font-black shadow-lg uppercase text-sm">Masuk</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- KOMPONEN GAME (DENGAN SCROLL INTERNAL) ---
+
+const MiniGame = ({ type, addStar, playSFX, onBack, totalStars }) => {
+  const [data, setData] = useState(null);
+  const [feedback, setFeedback] = useState(null);
+
+  const generate = useCallback(() => {
+    setFeedback(null);
+    if (type === 'math') {
+      const a = Math.floor(Math.random() * 10) + 1;
+      const b = Math.floor(Math.random() * 10) + 1;
+      const ans = a + b;
+      let opts = [ans];
+      while(opts.length < 4) {
+        const w = Math.floor(Math.random() * 20);
+        if(!opts.includes(w)) opts.push(w);
+      }
+      setData({ q: `${a} + ${b}`, a: ans, opts: opts.sort(() => Math.random() - 0.5) });
+    } else if (type === 'colors') {
+      const colors = [
+        { n: 'MERAH', c: 'bg-red-500' }, { n: 'BIRU', c: 'bg-blue-500' },
+        { n: 'HIJAU', c: 'bg-green-500' }, { n: 'KUNING', c: 'bg-yellow-400' },
+        { n: 'UNGU', c: 'bg-purple-500' }, { n: 'ORANYE', c: 'bg-orange-500' }
+      ];
+      const target = colors[Math.floor(Math.random() * colors.length)];
+      setData({ target, opts: [...colors].sort(() => Math.random() - 0.5) });
+    } else if (type === 'animals') {
+      const animals = [
+        { n: 'KUCING', i: '🐱' }, { n: 'ANJING', i: '🐶' }, { n: 'SINGA', i: '🦁' },
+        { n: 'GAJAH', i: '🐘' }, { n: 'PANDA', i: '🐼' }, { n: 'MONYET', i: '🐒' }
+      ];
+      const target = animals[Math.floor(Math.random() * animals.length)];
+      let opts = [target];
+      while(opts.length < 3) {
+        const x = animals[Math.floor(Math.random() * animals.length)];
+        if(!opts.find(a => a.n === x.n)) opts.push(x);
+      }
+      setData({ target, opts: opts.sort(() => Math.random() - 0.5) });
+    } else if (type === 'shapes') {
+      const shapes = [{n:'BULAT',i:'●'},{n:'KOTAK',i:'■'},{n:'SEGITIGA',i:'▲'},{n:'BINTANG',i:'★'}];
+      const target = shapes[Math.floor(Math.random() * shapes.length)];
+      setData({ target, opts: shapes });
+    } else if (type === 'letters') {
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+      const target = letters[Math.floor(Math.random() * letters.length)];
+      let opts = [target];
+      while(opts.length < 4) {
+        const x = letters[Math.floor(Math.random() * letters.length)];
+        if(!opts.includes(x)) opts.push(x);
+      }
+      setData({ target, opts: opts.sort(() => Math.random() - 0.5) });
+    } else if (type === 'logic') {
+      const l = Math.floor(Math.random() * 25) + 5;
+      let r = Math.floor(Math.random() * 25) + 5;
+      while(r === l) r = Math.floor(Math.random() * 25) + 5;
+      setData({ left: l, right: r, target: Math.random() > 0.5 ? 'BESAR' : 'KECIL' });
+    }
+  }, [type]);
+
+  useEffect(() => generate(), [generate]);
+
+  const handleAnswer = (val) => {
+    if (feedback) return;
+    const isCorrect = (type === 'math' && val === data.a) ||
+                    (type === 'colors' && val.n === data.target.n) ||
+                    (type === 'animals' && val.n === data.target.n) ||
+                    (type === 'shapes' && val.n === data.target.n) ||
+                    (type === 'letters' && val === data.target) ||
+                    (type === 'logic' && (data.target === 'BESAR' ? (val === 'l' ? data.left > data.right : data.right > data.left) : (val === 'l' ? data.left < data.right : data.right < data.left)));
+
+    if (isCorrect) {
+      setFeedback('correct'); playSFX('correct'); addStar(10);
+      setTimeout(generate, 1000);
+    } else {
+      setFeedback('wrong'); playSFX('wrong');
+      setTimeout(() => setFeedback(null), 1000);
+    }
+  };
+
+  const getThemeColor = () => {
+    switch(type) {
+      case 'math': return 'bg-blue-50';
+      case 'colors': return 'bg-pink-50';
+      case 'animals': return 'bg-green-50';
+      case 'shapes': return 'bg-orange-50';
+      case 'letters': return 'bg-purple-50';
+      case 'logic': return 'bg-cyan-50';
+      default: return 'bg-white';
+    }
+  };
+
+  if (!data) return null;
+
+  return (
+    <div className={`fixed inset-0 z-[100] flex flex-col ${getThemeColor()} animate-in fade-in duration-300`}>
+      {/* Header Game Tetap (Sticky) */}
+      <div className="flex justify-between items-center p-4 w-full bg-white/30 backdrop-blur-sm z-[110]">
+        <button 
+          onClick={() => { playSFX('click'); onBack(); }}
+          className="p-2.5 bg-white shadow-lg rounded-xl text-gray-800 active:scale-90 transition-all"
+        >
+          <X size={24} strokeWidth={3} />
+        </button>
+        <div className="flex items-center gap-2 bg-yellow-400 px-4 py-2 rounded-2xl text-white font-black shadow-lg">
+          <Star size={18} fill="white" /> {totalStars}
+        </div>
+      </div>
+
+      {/* Area Konten Game Bisa Di-scroll */}
+      <div className="flex-1 overflow-y-auto w-full px-6 py-8 flex flex-col items-center justify-start min-h-0">
+        <div className="w-full max-w-sm flex flex-col items-center">
+          {type === 'math' && (
+            <div className="w-full space-y-8">
+              <div className="bg-white p-10 rounded-[50px] shadow-2xl text-center border-b-8 border-blue-200">
+                <h2 className="text-7xl font-black text-blue-600 tabular-nums leading-none">{data.q}</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {data.opts.map(o => (
+                  <button key={o} onClick={() => handleAnswer(o)} className="bg-white py-8 rounded-[30px] text-4xl font-black text-blue-800 shadow-xl border-b-4 border-blue-100 active:translate-y-1 active:border-b-0 transition-all">{o}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {type === 'colors' && (
+            <div className="w-full flex flex-col items-center gap-10">
+              <div className="bg-white px-10 py-5 rounded-full shadow-xl border-b-4 border-pink-100 animate-bounce">
+                <h2 className="text-3xl font-black text-pink-600 tracking-widest">{data.target.n}</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-5 w-full">
+                {data.opts.map((o, i) => (
+                  <button key={i} onClick={() => handleAnswer(o)} className={`${o.c} aspect-square rounded-[40px] shadow-2xl border-b-8 border-black/10 active:scale-95 transition-all`} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {type === 'animals' && (
+            <div className="w-full flex flex-col items-center gap-8">
+              <div className="text-[140px] drop-shadow-2xl animate-pulse leading-none">{data.target.i}</div>
+              <div className="flex flex-col gap-4 w-full">
+                {data.opts.map(o => (
+                  <button key={o.n} onClick={() => handleAnswer(o)} className="bg-white py-5 rounded-[35px] text-2xl font-black text-green-700 shadow-xl border-l-8 border-green-400 active:scale-95 transition-all uppercase tracking-wide">{o.n}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {type === 'shapes' && (
+            <div className="w-full flex flex-col items-center gap-8">
+              <h2 className="text-4xl font-black text-orange-700 uppercase tracking-widest">{data.target.n}</h2>
+              <div className="grid grid-cols-2 gap-6 w-full">
+                {data.opts.map(s => (
+                  <button key={s.n} onClick={() => handleAnswer(s)} className="bg-white aspect-square rounded-[50px] flex items-center justify-center text-[100px] text-orange-500 shadow-2xl border-b-8 border-orange-100 active:scale-95 transition-all">{s.i}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {type === 'letters' && (
+            <div className="w-full flex flex-col items-center gap-8">
+              <h2 className="text-xl font-black text-gray-400 uppercase tracking-widest text-center">Temukan Huruf <span className="text-8xl text-purple-600 block mt-4">{data.target}</span></h2>
+              <div className="grid grid-cols-2 gap-4 w-full">
+                {data.opts.map(o => (
+                  <button key={o} onClick={() => handleAnswer(o)} className="bg-white aspect-square rounded-[40px] flex items-center justify-center text-6xl font-black text-purple-700 shadow-xl border-b-8 border-purple-100 active:translate-y-1 transition-all">{o}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {type === 'logic' && (
+            <div className="w-full flex flex-col items-center gap-12">
+              <h2 className="text-3xl font-black text-cyan-800 text-center leading-tight uppercase">Mana yang Lebih <span className="text-orange-500 underline underline-offset-8">{data.target}</span>?</h2>
+              <div className="flex flex-col gap-8 w-full items-center">
+                <button onClick={() => handleAnswer('l')} className="bg-white rounded-full flex items-center justify-center shadow-2xl border-4 border-cyan-100 active:scale-90 transition-all overflow-hidden" style={{ width: data.left * 4.5, height: data.left * 4.5, maxWidth: '200px', maxHeight: '200px' }}>
+                  <Star size={data.left * 2} className="text-cyan-500" fill="currentColor" />
+                </button>
+                <button onClick={() => handleAnswer('r')} className="bg-white rounded-full flex items-center justify-center shadow-2xl border-4 border-cyan-100 active:scale-90 transition-all overflow-hidden" style={{ width: data.right * 4.5, height: data.right * 4.5, maxWidth: '200px', maxHeight: '200px' }}>
+                  <Star size={data.right * 2} className="text-cyan-500" fill="currentColor" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <FeedbackOverlay status={feedback} />
+    </div>
+  );
+};
+
+// --- LAYAR-LAYAR UTAMA ---
+
+const HomeScreen = ({ onStartGame, stars, avatar, level, xp, playSFX }) => (
+  <div className="p-6 pb-20 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="flex justify-between items-center">
+      <div className="flex items-center gap-4">
+        <div className="w-20 h-20 bg-indigo-600 rounded-[24px] shadow-xl flex items-center justify-center text-4xl border-4 border-white rotate-2 transition-transform hover:rotate-0">
+          {avatar.char}
+        </div>
+        <div>
+          <p className="text-[10px] font-black text-indigo-500 tracking-[0.2em] uppercase mb-1">Pemain Hebat</p>
+          <div className="flex items-center gap-3">
+            <span className="font-black text-2xl text-gray-800 leading-none">LV. {level}</span>
+            <div className="w-24 h-2.5 bg-gray-100 rounded-full overflow-hidden border border-gray-50">
+              <div className="h-full bg-indigo-500 shadow-[0_0_10px_rgba(79,70,229,0.3)] transition-all duration-700" style={{ width: `${xp}%` }} />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="bg-yellow-400 px-5 py-2.5 rounded-2xl shadow-lg flex items-center gap-2 text-white font-black animate-pulse">
+        <Star size={20} fill="white" /> {stars}
+      </div>
+    </div>
+
+    <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[45px] p-8 text-white shadow-2xl relative overflow-hidden group">
+      <div className="relative z-10">
+        <h3 className="text-3xl font-black mb-1 uppercase tracking-tight">Ayo Belajar!</h3>
+        <p className="text-indigo-100 font-medium mb-8 opacity-80 leading-relaxed">Selesaikan misi untuk mendapatkan piala baru hari ini!</p>
+        <button className="bg-yellow-400 text-yellow-900 px-10 py-4 rounded-[20px] font-black shadow-xl hover:bg-yellow-300 active:scale-95 transition-all uppercase text-sm">
+          Mulai Petualangan
+        </button>
+      </div>
+      <Rocket className="absolute right-[-30px] bottom-[-30px] text-white/10 w-56 h-56 rotate-12 group-hover:translate-y-[-10px] group-hover:translate-x-[-10px] transition-transform duration-700" />
+    </div>
+
+    <div className="space-y-6">
+      <h2 className="text-xl font-black text-gray-800 flex items-center gap-2 uppercase tracking-tight">
+        <Play size={20} fill="currentColor" /> Area Bermain
+      </h2>
+
+      <div className="grid grid-cols-2 gap-4">
+        {[
+          { id: 'math', icon: Calculator, label: 'Angka', color: 'bg-blue-500', bg: 'bg-blue-50', text: 'text-blue-600' },
+          { id: 'colors', icon: Palette, label: 'Warna', color: 'bg-pink-500', bg: 'bg-pink-50', text: 'text-pink-600' },
+          { id: 'animals', icon: Dog, label: 'Hewan', color: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-600' },
+          { id: 'letters', icon: Type, label: 'Huruf', color: 'bg-purple-500', bg: 'bg-purple-50', text: 'text-purple-600' },
+          { id: 'shapes', icon: Square, label: 'Bentuk', color: 'bg-orange-500', bg: 'bg-orange-50', text: 'text-orange-600' },
+          { id: 'logic', icon: Maximize, label: 'Logika', color: 'bg-cyan-500', bg: 'bg-cyan-50', text: 'text-cyan-600' }
+        ].map(g => (
+          <button 
+            key={g.id} 
+            onClick={() => { playSFX('click'); onStartGame(g.id); }} 
+            className={`${g.bg} p-6 rounded-[35px] flex flex-col items-center gap-3 border-b-8 border-black/5 active:border-b-0 active:translate-y-1 transition-all group`}
+          >
+            <div className={`${g.color} p-4 rounded-2xl text-white shadow-lg group-hover:rotate-12 transition-transform`}>
+              <g.icon size={30} strokeWidth={3} />
+            </div>
+            <span className={`font-black ${g.text} text-[10px] tracking-widest uppercase`}>{g.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+const BelajarScreen = () => (
+  <div className="p-6 pb-20 space-y-6">
+    <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Modul Belajar</h1>
+    <div className="space-y-4">
+      {[
+        { t: 'Angka Dasar', sub: 'Mengenal 1-20', p: 100, c: 'bg-blue-500', i: <Calculator size={20}/> },
+        { t: 'Warna Visual', sub: 'Nama-nama warna', p: 60, c: 'bg-pink-500', i: <Palette size={20}/> },
+        { t: 'Nama Hewan', sub: 'Mengenali fauna', p: 20, c: 'bg-green-500', i: <Dog size={20}/> },
+        { t: 'Membaca', sub: 'Ejaan A-Z', p: 0, c: 'bg-purple-500', i: <Type size={20}/>, locked: true },
+        { t: 'Logika Dasar', sub: 'Perbandingan benda', p: 10, c: 'bg-cyan-500', i: <Maximize size={20}/> }
+      ].map((m, i) => (
+        <div key={i} className={`bg-white p-6 rounded-[35px] shadow-sm border border-gray-100 flex items-center gap-5 ${m.locked ? 'opacity-40 grayscale' : ''}`}>
+          <div className={`${m.c} p-4 rounded-2xl text-white shadow-md`}>{m.i}</div>
+          <div className="flex-1">
+            <h4 className="font-black text-gray-800 mb-2">{m.t}</h4>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className={`h-full ${m.c}`} style={{ width: `${m.p}%` }} />
+              </div>
+              <span className="text-[10px] font-black text-gray-400">{m.p}%</span>
+            </div>
+          </div>
+          {m.locked && <Lock size={18} className="text-gray-400" />}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const PialaScreen = ({ stars }) => (
+  <div className="p-6 pb-20 bg-orange-50 min-h-full flex flex-col items-center">
+    <h1 className="text-3xl font-black text-gray-800 mb-2 uppercase tracking-tighter">Piala Hadiah</h1>
+    <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-12">Total Bintang: {stars}</p>
+    <div className="grid grid-cols-2 gap-8 w-full max-w-sm">
+      {ACHIEVEMENTS.map((a) => {
+        const isUnlocked = stars >= a.req;
+        return (
+          <div key={a.id} className={`flex flex-col items-center gap-3 transition-all ${!isUnlocked ? 'opacity-20 grayscale' : 'animate-in zoom-in'}`}>
+            <div className="w-28 h-28 bg-white rounded-full flex items-center justify-center border-8 border-orange-100 shadow-xl relative">
+              {a.icon}
+              {isUnlocked && <Sparkles className="absolute top-0 right-0 text-yellow-500 animate-pulse" />}
+            </div>
+            <span className="font-black text-gray-800 text-xs text-center uppercase tracking-tighter leading-tight">{isUnlocked ? a.title : `Butuh ${a.req} ⭐`}</span>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
+
+const ShopScreen = ({ stars, onBuy, ownedIds, playSFX }) => (
+  <div className="p-6 pb-20 bg-indigo-50 min-h-full">
+    <div className="flex justify-between items-center mb-10">
+      <h1 className="text-3xl font-black text-indigo-950 uppercase tracking-tighter">Toko Karakter</h1>
+      <div className="bg-yellow-400 px-4 py-2 rounded-2xl shadow-lg flex items-center gap-2 text-white font-black">
+        <Star size={18} fill="white" /> {stars}
+      </div>
+    </div>
+    <div className="grid grid-cols-1 gap-4">
+      {AVATARS.map((av) => {
+        const isOwned = ownedIds.includes(av.id);
+        const canAfford = stars >= av.cost;
+        return (
+          <div key={av.id} className="bg-white p-6 rounded-[35px] shadow-sm border border-indigo-100 flex items-center gap-6">
+            <div className="text-5xl w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center shadow-inner border-2 border-white">{av.char}</div>
+            <div className="flex-1">
+              <h4 className="font-black text-gray-800 text-lg uppercase tracking-tight">{av.name}</h4>
+              <p className="text-xs font-black text-indigo-400 flex items-center gap-1"><Star size={14} fill="currentColor" /> {av.cost} BINTANG</p>
+            </div>
+            {isOwned ? (
+              <span className="bg-green-100 text-green-600 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest text-center">Ada</span>
+            ) : (
+              <button 
+                onClick={() => { playSFX('buy'); onBuy(av); }} 
+                disabled={!canAfford} 
+                className={`px-6 py-2.5 rounded-2xl font-black text-xs shadow-xl transition-all ${canAfford ? 'bg-indigo-600 text-white active:scale-95' : 'bg-gray-200 text-gray-400'}`}
+              >
+                BELI
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
+
+const ProfilScreen = ({ avatar, isMuted, toggleMusic, onOpenSettings }) => (
+  <div className="p-6 pb-20 bg-white min-h-full flex flex-col items-center">
+    <div className="w-40 h-40 bg-indigo-600 rounded-[60px] flex items-center justify-center text-8xl shadow-2xl mt-12 mb-8 border-8 border-indigo-50 rotate-3 transition-transform hover:rotate-0">
+      {avatar.char}
+    </div>
+    <h2 className="text-3xl font-black text-gray-800 mb-12 uppercase tracking-tighter">Profil Pemain</h2>
+    
+    <div className="w-full space-y-4 max-w-sm">
+      <div className="bg-gray-50 p-6 rounded-[40px] flex items-center justify-between border-b-4 border-gray-100">
+        <div className="flex items-center gap-5 text-gray-700">
+          <Volume2 size={26} strokeWidth={2.5} />
+          <span className="font-black text-xl uppercase tracking-tighter">Musik Latar</span>
+        </div>
+        <button onClick={toggleMusic} className={`w-18 h-10 rounded-full relative transition-colors ${!isMuted ? 'bg-green-500' : 'bg-gray-300'}`}>
+          <div className={`absolute top-1.5 w-7 h-7 bg-white rounded-full transition-all shadow-md ${!isMuted ? 'left-9.5' : 'left-1.5'}`} />
+        </button>
+      </div>
+
+      <button onClick={onOpenSettings} className="w-full bg-red-50 p-6 rounded-[40px] flex items-center justify-between border-b-4 border-red-100 active:bg-red-100 transition-all">
+        <div className="flex items-center gap-5 text-red-600">
+          <Settings size={26} strokeWidth={2.5} />
+          <span className="font-black text-xl uppercase tracking-tighter">Pengaturan</span>
+        </div>
+        <Lock size={20} className="text-red-300" />
+      </button>
+    </div>
+  </div>
+);
+
+// --- APLIKASI UTAMA ---
+
+export default function App() {
+  const getStoredValue = (key, initial) => {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored !== null ? JSON.parse(stored) : initial;
+    } catch (e) { return initial; }
+  };
+
+  const [activeTab, setActiveTab] = useState('home');
+  const [activeGame, setActiveGame] = useState(null);
+  
+  const [stars, setStars] = useState(() => getStoredValue('pk_stars_v2', 0));
+  const [xp, setXp] = useState(() => getStoredValue('pk_xp_v2', 0));
+  const [level, setLevel] = useState(() => getStoredValue('pk_level_v2', 1));
+  const [ownedAvatars, setOwnedAvatars] = useState(() => getStoredValue('pk_owned_avatars_v2', ['1']));
+  const [currentAvatar, setCurrentAvatar] = useState(() => {
+    const avatarId = getStoredValue('pk_current_avatar_v2', '1');
+    return AVATARS.find(a => a.id === avatarId) || AVATARS[0];
+  });
+
+  const [isMuted, setIsMuted] = useState(true);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [showGate, setShowGate] = useState(false);
+
+  const bgmRef = useRef(null);
+
+  useEffect(() => {
+    bgmRef.current = new Audio(SOUNDS.bgm);
+    bgmRef.current.loop = true;
+    bgmRef.current.volume = 0.15;
+    return () => { if (bgmRef.current) bgmRef.current.pause(); };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('pk_stars_v2', JSON.stringify(stars));
+    localStorage.setItem('pk_xp_v2', JSON.stringify(xp));
+    localStorage.setItem('pk_level_v2', JSON.stringify(level));
+    localStorage.setItem('pk_owned_avatars_v2', JSON.stringify(ownedAvatars));
+    localStorage.setItem('pk_current_avatar_v2', JSON.stringify(currentAvatar.id));
+  }, [stars, xp, level, ownedAvatars, currentAvatar]);
+
+  const playSFX = (type) => {
+    if (isMuted && type !== 'click') return;
+    const s = new Audio(SOUNDS[type]);
+    s.volume = 0.4;
+    s.play().catch(() => {});
+  };
+
+  const toggleMusic = () => {
+    playSFX('click');
+    if (isMuted) {
+      bgmRef.current.play().catch(() => {});
+      setIsMuted(false);
+    } else {
+      bgmRef.current.pause();
+      setIsMuted(true);
+    }
+  };
+
+  const addStar = (n) => {
+    setStars(prev => prev + n);
+    setXp(prev => {
+      const nextXp = prev + n;
+      if (nextXp >= 100) {
+        setLevel(l => l + 1);
+        setShowConfetti(true);
+        playSFX('win');
+        setTimeout(() => setShowConfetti(false), 5000);
+        return 0;
+      }
+      return nextXp;
+    });
+  };
+
+  const buyAvatar = (av) => {
+    if (stars >= av.cost && !ownedAvatars.includes(av.id)) {
+      setStars(prev => prev - av.cost);
+      setOwnedAvatars(prev => [...prev, av.id]);
+      setCurrentAvatar(av);
+    } else if (ownedAvatars.includes(av.id)) {
+      setCurrentAvatar(av);
+    }
+  };
+
+  return (
+    <div className="max-w-md mx-auto h-screen bg-white flex flex-col relative shadow-2xl overflow-hidden font-sans select-none">
+      {showConfetti && <Confetti />}
+      {showGate && <ParentalGate onVerify={() => { setShowGate(false); setActiveTab('profil'); }} onCancel={() => setShowGate(false)} />}
+      
+      {/* Container Utama dengan Overflow yang Benar */}
+      <div className="flex-1 overflow-y-auto relative min-h-0 bg-white">
+        {activeGame ? (
+          <MiniGame 
+            type={activeGame} 
+            addStar={addStar} 
+            playSFX={playSFX} 
+            onBack={() => setActiveGame(null)} 
+            totalStars={stars} 
+          />
+        ) : (
+          <div className="h-full flex flex-col">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth">
+              {activeTab === 'home' && <HomeScreen onStartGame={setActiveGame} stars={stars} avatar={currentAvatar} level={level} xp={xp} playSFX={playSFX} />}
+              {activeTab === 'belajar' && <BelajarScreen />}
+              {activeTab === 'piala' && <PialaScreen stars={stars} />}
+              {activeTab === 'shop' && <ShopScreen stars={stars} onBuy={buyAvatar} ownedIds={ownedAvatars} playSFX={playSFX} />}
+              {activeTab === 'profil' && <ProfilScreen avatar={currentAvatar} isMuted={isMuted} toggleMusic={toggleMusic} onOpenSettings={() => setShowGate(true)} />}
+              
+              {/* Spacer agar konten tidak tertutup navigasi bawah */}
+              <div className="h-28 w-full" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Navigasi Bawah */}
+      {!activeGame && (
+        <div className="h-24 bg-white/95 backdrop-blur-xl border-t border-gray-100 flex justify-around items-center px-4 shrink-0 z-[90]">
+          {[
+            { id: 'home', icon: Home, label: 'Main' },
+            { id: 'belajar', icon: BookOpen, label: 'Belajar' },
+            { id: 'piala', icon: Trophy, label: 'Piala' },
+            { id: 'shop', icon: ShoppingBag, label: 'Toko' },
+            { id: 'profil', icon: User, label: 'Saya' }
+          ].map(t => (
+            <button 
+              key={t.id} 
+              onClick={() => { playSFX('click'); setActiveTab(t.id); }} 
+              className={`flex flex-col items-center gap-1.5 transition-all w-16 ${activeTab === t.id ? 'text-indigo-600 scale-110' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              <div className={`p-2.5 rounded-2xl transition-all ${activeTab === t.id ? 'bg-indigo-50 shadow-inner' : ''}`}>
+                <t.icon size={26} strokeWidth={activeTab === t.id ? 3 : 2.5} />
+              </div>
+              <span className="text-[9px] font-black uppercase tracking-widest">{t.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
